@@ -1,54 +1,99 @@
-// 1.provider for distributing auth context
-// 2.hook for consuming auth context
-import React from "react";
-import { Models } from "react-native-appwrite";
+import { createContext, useContext, useEffect, useState } from "react";
+import { ID, Models } from "react-native-appwrite";
+import { account } from "./appwrite";
 
 type AuthContextType = {
-    user: Models.User <Models.Preferences> | null;
-    signUp:(email:string,password:string) => Promise<void>;
-    signIn:(email:string,password:string) => Promise<void>;
-}
+  user: Models.User<Models.Preferences> | null;
+  isLoadingUser: boolean;
+  signUp: (email: string, password: string) => Promise<string | null>;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
+};
 
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
+    null
+  );
 
+  const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
 
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+  useEffect(() => {
+    getUser();
+  }, []);
 
-
-const AuthProvider = ({children}:{children:React.ReactNode}) => {
-
-    const signUp = async (email:string,password:string) => {
-        try{
-
-        }catch(error){
-            
-        }
+  const getUser = async () => {
+    try {
+      const session = await account.get();
+      setUser(session);
+    } catch (error) {
+      setUser(null);
+    } finally {
+      setIsLoadingUser(false);
     }
+  };
 
-    const signIn = async (email:string,password:string) => {}
+  const signUp = async (email: string, password: string) => {
+    try {
+      await account.create(ID.unique(), email, password);
+      await signIn(email, password);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
+      }
 
-    const user = null; // Replace with actual user state management
+      return "An error occured during signup";
+    }
+  };
+  const signIn = async (email: string, password: string) => {
+    try {
+      await account.createEmailPasswordSession(email, password);
+      const session = await account.get();
+      setUser(session);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
+      }
 
+      return "An error occured during sign in";
+    }
+  };
 
-
-
-
-
-
+  const signOut = async () => {
+    try {
+      await account.deleteSession("current");
+      setUser(null);
+    } catch (error) {
+      // If already a guest, just clear user state
+      if (
+        error instanceof Error &&
+        error.message &&
+        error.message.includes("guests")
+      ) {
+        setUser(null);
+      } else {
+        console.log(error);
+      }
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{user,signUp,signIn}}>
-        {children}
+    <AuthContext.Provider
+      value={{ user, isLoadingUser, signUp, signIn, signOut }}
+    >
+      {children}
     </AuthContext.Provider>
-    
-  )
-}
-export default AuthProvider
-
-export function useAuth(){
-
+  );
 }
 
-function CreateContext(undefined: undefined) {
-    throw new Error("Function not implemented.")
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be inside of the AuthProvider");
+  }
+
+  return context;
 }
