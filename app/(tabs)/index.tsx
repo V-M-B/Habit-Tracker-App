@@ -1,14 +1,13 @@
 import {
   client,
-  collectionId,
-  databaseId,
+  COMPLETIONS_COLLECTION_ID,
+  DATABASE_ID,
   databases,
-  // HABITS_COLLECTION_ID,
+  HABITS_COLLECTION_ID,
   RealtimeResponse,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Habit } from "@/types/database.type";
-// import { Habit, HabitCompletion } from "@/types/database.type";
+import { Habit, HabitCompletion } from "@/types/database.type";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -25,7 +24,7 @@ export default function Index() {
 
   useEffect(() => {
     if (user) {
-      const habitsChannel = `databases.${databaseId}.collections.${collectionId}.documents`;
+      const habitsChannel = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
       const habitsSubscription = client.subscribe(
         habitsChannel,
         (response: RealtimeResponse) => {
@@ -51,7 +50,7 @@ export default function Index() {
         }
       );
 
-      const completionsChannel = `databases.${databaseId}.collections.${collectionId}.documents`;
+      const completionsChannel = `databases.${DATABASE_ID}.collections.${COMPLETIONS_COLLECTION_ID}.documents`;
       const completionsSubscription = client.subscribe(
         completionsChannel,
         (response: RealtimeResponse) => {
@@ -78,8 +77,8 @@ export default function Index() {
   const fetchHabits = async () => {
     try {
       const response = await databases.listDocuments(
-        databaseId,
-        collectionId,
+        DATABASE_ID,
+        HABITS_COLLECTION_ID,
         [Query.equal("user_id", user?.$id ?? "")]
       );
       setHabits(response.documents as Habit[]);
@@ -93,14 +92,14 @@ export default function Index() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const response = await databases.listDocuments(
-        databaseId,
-        collectionId,
+        DATABASE_ID,
+        COMPLETIONS_COLLECTION_ID,
         [
           Query.equal("user_id", user?.$id ?? ""),
           Query.greaterThanEqual("completed_at", today.toISOString()),
         ]
       );
-      const completions = response.documents as Hab itCompletion[];
+      const completions = response.documents as HabitCompletion[];
       setCompletedHabits(completions.map((c) => c.habit_id));
     } catch (error) {
       console.error(error);
@@ -109,7 +108,7 @@ export default function Index() {
 
   const handleDeleteHabit = async (id: string) => {
     try {
-      await databases.deleteDocument(databaseId, collectionId, id);
+      await databases.deleteDocument(DATABASE_ID, HABITS_COLLECTION_ID, id);
     } catch (error) {
       console.error(error);
     }
@@ -120,8 +119,8 @@ export default function Index() {
     try {
       const currentDate = new Date().toISOString();
       await databases.createDocument(
-        databaseId,
-        collectionId,
+        DATABASE_ID,
+        COMPLETIONS_COLLECTION_ID,
         ID.unique(),
         {
           habit_id: id,
@@ -133,7 +132,7 @@ export default function Index() {
       const habit = habits?.find((h) => h.$id === id);
       if (!habit) return;
 
-      await databases.updateDocument(databaseId, collectionId, id, {
+      await databases.updateDocument(DATABASE_ID, HABITS_COLLECTION_ID, id, {
         streak_count: habit.streak_count + 1,
         last_completed: currentDate,
       });
